@@ -1,0 +1,310 @@
+library(tidyverse)
+library(caret)
+library(olsrr)
+library(car)
+library(broom)
+# PREDAVANJA
+ncovMatrix <-cov(mydata, use="pairwise.complete.obs")
+ncovMatrix <-cov(mydata, use = "complete.obs")
+
+# brisanje
+df <-subset(mydata, select = -c(x,z))
+df <- mydata[-c(1,3:4)]
+
+lisewise i pairwise
+
+# umetanje 
+library(imputeTS)
+na.mean(mydata, option = "mean")
+na.mean(mydata, option = "median")
+na.mean(mydata, option = "mode")
+
+# statisticko ucenje
+# veza izmedju reklamiranja i prodaje
+head(advertising)
+summary(advertising)
+# inspection of bottom 5
+tail(advertising)
+# str -> getting sturcture od whole data set
+str(advertising)
+lm.radio <- lm(Sales~Radio)
+The above output gives information as-
+
+# There are 200 rows and 4 varialbles
+# Variables are : TV,Radio,Newspaper,Sales
+# All are numeric variables.
+
+# Checking outliers
+data <- advertising
+boxplot(advertising)
+# the above plot shows that two outliers are present in the variable "Newspaper"
+# removing outliers
+adveritising <- advertising[-which(advertising$Newspaper %in% boxplot.stats(advertising$Newspaper)$out),]
+
+# removed outliers
+boxplot(adveritising)
+
+#checking missing values
+table(is.na(adveritising)) 
+# FALSE 792 -> ne postoje NA vrednosti -> isto moze i sa summary da se vidi
+
+# creating scatter plot matix
+pairs(data, upper.panel = NULL)
+
+# This output shows that -
+
+# No or very low linear relationship between TV and Radio variable.
+# Low linear relationship between TV and Newspaper variable.
+# Moderate linear relationship between Radio and Newspaper variable.
+# High linear relationship between TV and Sales , Radio and Sales , Newspaper and Sales.
+# A small curvilinear relationship is also present between TV and Sales as well as Radio and Sales.
+
+# scatter plot between TV and Sales
+plot(adveritising$TV, adveritising$Sales)
+# scatter plot between TV and Sales -> curvilinear relationship
+plot(adveritising$Radio, adveritising$Sales)
+
+# scatter plot between Newspaper and Sales
+plot(adveritising$Newspaper, adveritising$Sales)
+
+# scatter plot between TV and Radio
+plot(adveritising$TV, adveritising$Radio)
+
+# data set into two parts. One part is known as train data set and other is test data set. 
+
+# randomly Split the data into training and test set
+set.seed(123)
+training.samples <- adveritising$Sales %>%
+createDataPartition(p = 0.75, list = FALSE)
+train.data <- adveritising[training.samples,]
+test.data <- adveritising[-training.samples,]
+
+#  train.data for fitting/training the model
+# test.data to check the performance of model.
+
+# Fitting Simple Linear Regression
+# 1. Sales~TV
+# 2. Sales~Radio
+# 3. Sales~Newspaper
+
+# Sales~TV
+sm1 <- lm(Sales~TV, data = train.data)
+summary(sm1)
+# Created model is statistically significant since p-value <<< 0.05 (see in the last line of output)
+# From the coefficients section, it is clear that both coefficients (slope and intercept) are statistically significant since p-value <<< 0.05
+# This model with TV as predictor explains approximately 81% variability of target (Sales).
+# Residual standard error for the model is 2.29
+
+# Sales~Radio
+sm2 <- lm(Sales ~ Radio, data = train.data)
+summary(sm2)
+
+# Created model is statistically significant since p-value << 0.05 (see in the last line of output)
+# From the coefficients section, it is clear that both coefficients (slope and intercept) are statistically significant since p-value << 0.05
+# This model with TV as predictor explains approximately 13% variability of target (Sales).
+# Residual standard error for the model is 4.917
+
+# Sales~Newspaper
+sm3 <- lm(Sales ~ Newspaper, data = train.data)
+summary(sm3)
+
+# Created model is statistically significant since p-value < 0.05 (see in the last line of output)
+# From the coefficients section, it is clear that both coefficients (slope and intercept) are statistically significant since p-value < 0.05
+# This model with TV as predictor explains approximately 2% variability of target (Sales).
+# Residual standard error for the model is 5.21
+
+# Simple Linear Regresion Model with Tv as predictor 
+# scatter plot
+plot(train.data$TV,train.data$Sales)
+abline(lm(train.data$Sales ~ train.data$TV), col = "blue")
+
+# The above plot shows that it is not feasible to predict Sales only on the basis of a single predictor due to more variability in the Sales.
+
+# Fitting Multiple Linear Regression with Diagnostic Plot
+
+# Forward Selection method
+# Sales,TV,Radio (Newspaper has 2%)
+mm1 <-lm(Sales ~ TV + Radio, data = train.data)
+summary(mm1)
+
+# Created model is statistically significant since p-value <<< 0.05 (see in the last line of output)
+# From the coefficients section, it is clear that both coefficients (slopes and intercept) are statistically significant since p-value <<< 0.05
+# This model with TV and Radio as predictors explains approximately 89% variability of target (Sales) that is a better indication with respect to the model with TV alone as predictor.
+# Residual standard error for the model is 1.715
+
+# we must test, whether this improvement in Adjusted R-squared is statistically significant ?
+
+# i.e., we want to test the null hypothesis - H0 : The improvement in Adjusted R-squared is not statistically significant. Vs the alternative hypothesis - H1 : The improvement in Adjusted R-squared is statistically significant.
+
+# For this testing, we use ANOVA (Analysis of Variance) technique 
+# null hypothesis
+anova(sm1,mm1)
+
+# p-value for testing null hypothesis. Since this value is extremely less than 0.05, hence we have sufficient evidence from the data to reject the null hypothesis and accept the alternative > Pr(>F)
+
+# Include the third predictor Newspaper also in your multiple linear regression model and see what happens.
+
+mm2 <- lm(Sales~TV+Radio+Newspaper, data = train.data)
+summary(mm2)
+
+# From the coefficients section of the above output, It is clear that Newspaper predictor is not statistically significant for the model due to p-value (0.69) > 0.05
+# Adjusted R-squared has been reduced 89.41 to 89.35
+# Residual standard error has been increased from 1.715 to 1.72
+# Although, the created model is statistically significant since p-value <<< 0.05 (see in the last line of output)
+# So, we have sufficient evidence from the data for not to include the Newspaper as predictor in the model.
+
+# Hence, Remove it from the model and we get the model as in previously fitted multiple linear regression model already stored in R-object mm1 
+mm1 #Sales~TV + Radio
+
+# Diagnostic Plots 
+# Residual plot -> Linearity between target and predictors
+
+plot(mm1,1)
+
+# Red line is approximately horizontal and linear which indicates that Linearity assumption holds well.
+# Residual fluctuates in a random manner inside a band drawn between Residuals = -4 to +4 which indicates that the fitted model is good for prediction to some extent. Why to some extent ?
+# Because the points 131 and 151 may be potential outliers since they are very far from other points. But we know that Large residuals (as in our case with 131 and 151 data points) could also indicate that either the variance is not constant (heterosceadasticity) or the true relationship between target and predictors is nonlinear. So, These possibilities should be investigated before the points are considered outliers.
+
+# Homoscedasticity Assumption - assumes that different samples have the same variance, even if they came from different populations - using Score test
+
+ols_test_score(mm1)
+
+# From the last line of the above output, It is clear that p-value is greater than the significance level 0.05. Hence, we may accept the null hypothesis and conclude that the variance is homogeneous. i.e., Homoscedasticity
+
+# Checking Auto-correlation Assumption -
+
+durbinWatsonTest(mm1)
+
+# p-value (0.166) > 0.05 , Hence, we may accept the null hypothesis and conclude that there is no autocorrelation between errors. i.e., Errors are uncorrelated.
+
+# Checking Multicolinearity
+vif(mm1)
+
+# Note that Variance inflation factor for both predictors are less than 5 (as a rule of thumb) , Hence there is no multicolinearity between predictors.
+
+#Checking Normality Assumption
+shapiro.test(mm1$residuals)
+#Normality does not hold since p-value < 0.05
+
+hist(mm1$residuals)
+# We see that there is some problem with left tail. It may be due to the data points 131 and 151 as pointed out earlier
+
+# fitting of Orthogonal Polynomial Regression between Sales and predictors TV and Radio. Newspaper variable is not statistically significant when we had fitted Multiple Linear Regression
+
+#  Fitting Orthogonal Polynomial Regression with Diagnostic Plot
+
+pm1 <- lm(Sales ~poly(TV,2)+poly(Radio,2)+TV:Radio, data = train.data)
+summary(pm1)
+
+
+# Created model is statistically significant since p-value <<< 0.05 (see in the last line of output)
+# From the coefficients section, it is clear that all coefficients are statistically significant since p-value <<< 0.05
+# This second order orthogonal polynomial model explains 92.58% variability of target (Sales) that is a better indication with respect to the multiple linear regression model with TV and Radio as predictor.
+# Residual standard error for the model is 1.436
+
+# Checking Whether this improvement in Adjusted R-squared is statistically significant -
+
+# i.e., we want to test the null hypothesis - H0 : The improvement in Adjusted R-squared is not statistically significant.
+
+# Vs the alternative hypothesis - H1 : The improvement in Adjusted R-squared is statistically significant.
+
+anova(mm1,pm1)
+# (9.441734e-12) indicates the p-value for testing null hypothesis. Since this value is extremely less than 0.05, hence we have sufficient evidence from the data to reject the null hypothesis and accept the alternative.
+
+# We have noticed that Adjusted R-squared has been increased to a great extent from 89% to 92.58%. So, Move towards fitting of third order orthogonal Polynomial Regression in two variable and see what happens.
+
+pm2 <- lm(Sales ~poly(TV,3) + poly(Radio, 3) + TV:Radio, data = train.data)
+summary(pm2)
+
+# third order of TV predictor is not statistically significant (p-value > 0.05). Hence, Don't include this term in the model.
+
+pm3 <- lm(Sales~poly(TV,2) + poly(Radio,3)+ TV:Radio, data = train.data)
+summary(pm3)
+
+# Created model is statistically significant since p-value <<< 0.05 (see in the last line of output)
+# From the coefficients section, it is clear that all coefficients are statistically significant since p-value <<< 0.05
+# This third order orthogonal polynomial model in two variables after removing third order of TV predictor explains 92.93% variability of target (Sales) that is a better indication with respect to the second order orthogonal polynomial regression model.
+# Residual standard error for the model is 1.401
+
+# Checking Whether this improvement in Adjusted R-squared is statistically significant -
+
+# i.e., we want to test the null hypothesis - H0 : The improvement in Adjusted R-squared is not statistically significant.
+
+# Vs the alternative hypothesis - H1 : The improvement in Adjusted R-squared is statistically significant.
+
+anova(pm1,pm3)
+
+# 0.004968654) indicates the p-value for testing null hypothesis. Since this value is extremely less than 0.05, hence we have sufficient evidence from the data to reject the null hypothesis and accept the alternative
+
+plot(pm3,1)
+
+# Red line is approximately horizontal and linear at Residuals = 0 which indicates that Linearity assumption holds well.
+# Residual fluctuates in a random manner inside a band drawn between Residuals = -4 to +4 which indicates that the fitted model is good for prediction to some extent. Why to some extent ?
+# Because again we see that the point 131 (Note : 151 is now with the other points) may be potential outlier since this is very far from other points.
+
+ols_test_score(pm3)
+durbinWatsonTest(pm3) 
+# Errors are uncorrelated.
+shapiro.test(pm3$residuals)
+# Errors are normally distributed.
+vif(pm3)
+# less then five (last column) -> no multicolinearity
+# Removing Observation number 131 from train data set
+
+#  Diagnostic metrics Table for model pm3
+dm = augment(pm3)
+head(dm)
+# This table consists of information on different diagnostic metrics such as Residuals (column - 9), cooks distance (column - 12) and Studentized Residuals (column - 13) and many more.
+# I will use last column of the above table to delete observation number 131.
+
+min(dm$.std.resid)
+# indicates an outlier
+# checking the index of observation in train data
+
+which(dm$.std.resid  %in% "-3.4452042988145")
+
+
+train.data[98,]
+train.data1 = train.data %>% filter(train.data$Sales != 1.6)
+nrow(train.data)
+nrow(train.data1)
+
+pm4 <- lm(Sales ~poly(TV,2) + poly(Radio,3) + TV:Radio, data = train.data1)
+summary(pm4)
+
+# Created model pm4 is statistically significant since p-value <<< 0.05 (see in the last line of output)
+# From the coefficients section, it is clear that all coefficients are statistically significant since p-value <<< 0.05
+# This polynomial model after removing the outlier explains 93.21% variability of target (Sales) that is a better indication with respect to the polynomial regression model stored in R-object pm3.
+# Residual standard error for the model is 1.347
+
+plot(pm4,1)
+ols_test_score(pm4)
+durbinWastonTest(pm4)
+shapiro.test(pm4$residuals)
+vif(pm4)
+
+dm1 = augment(pm4)
+min(dm1$.std.resid) 
+max(dm1$.std.resid)
+# less than abs 3
+
+# Making Prediction
+prediction = pm4 %>%predict(test.data)
+prediction
+data.frame(R2 = R2(prediction, test.data$Sales), RMSE = RMSE(prediction, test.data$Sales), MAE(prediction, test.data$Sales))
+
+# We obtain : R2 = 0.9526385 , which indicates a best fit.
+
+data <- data %>% filter(Sales != 1.6) 
+# removed outlier -> row that contains Sales  = 1.6
+
+# Cross Validation as follows
+set.seed(123)
+
+# define training contorl
+train.control <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+
+# train the model
+model_cv <- train(Sales ~ poly(TV,2) + poly(Radio, 3) + TV:Radio, data = data, method = "lm", trContol = train.control)
+print(model_cv)
+

@@ -1,0 +1,63 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+library(knitr)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(Lahman)
+
+d <- data.frame(Success = c(11,82,2,0,1203,5), Total = c(104,1351,26,40,7592,166))
+
+kable(d)
+career <- Batting %>%
+filter(AB>0) %>%
+anti_join(Pitching, by = "playerID") %>%
+group_by(playerID) %>%
+summarize(H = sum(H), AB = sum(AB)) %>%
+mutate(average = H/AB)
+
+career
+
+career <- Master %>%
+tibble() %>%
+select(playerID, nameFirst, nameLast) %>%
+unite(name, nameFirst, nameLast, sep = " ") %>%
+inner_join(career, by = "playerID") %>%
+select(where(~playerID))
+
+career %>%
+arrange(desc(average)) %>%
+head(5) %>% kable()
+
+#distribution of batting averages across players
+
+carre %>%
+filter(AB >= 500) %>%
+ggplot(data = career, mapping = aes(x = average)) + geom_histogram(binwidth = 0.005)
+
+career_filtered <- career %>% filter(AB >= 500)
+m <- MASS::fitdistr(career_filtered$average, dbeta, start = list(shape1 = 1, shape2 = 10))
+alpha0 <- m$estimate[1]
+beta0 <- m$estimate[2]
+
+ggplot(career_filtered) + geom_histogram(aes(average, y = ..density..), binwidth = 0.005)+stat_function(fun = function(x) dbeta(x, alpha0, beta0), color = "red", size = 1) + xlab("Betting average")
+
+career_eb <- career %>% mutate(eb_estimate = (H+alpha0)/(AB+alpha0+beta0))
+
+career_eb %>%
+arrange(desc(eb_estimate)) %>%
+head(5) %>% kable()
+
+career_eb %>%
+arrange(eb_estimate) %>%
+head(5) %>% kable()
+
+ggplot(career_eb, mapping = aes(average, eb_estimate, color = AB)) +
+geom_hline(yintercept = alpha0/(alpha0 +beta0), color = "red", lty = 2) +
+geom_point() +
+geom_abline(color = "red") +
+scale_colour_gradient(trans = "log", breaks = 10 ^ (1:5)) + xlab("Batting average") + ylab("Empirical Bayes batting average")
+
