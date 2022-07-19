@@ -1,0 +1,395 @@
+library(tidyverse)
+library(caret)
+library(olsrr)
+library(car)
+library(broom)
+head(advertising)
+summary(advertising)
+
+# struktura -> numericki/kategorijski
+str(advertising)
+
+# dimenzije modela 200 -> redova, 4 -> kolone
+dim(advertising)
+
+# multi-linearna regresija za y~x
+# za svaku kategoriju ~.
+model <-lm(advertising$Sales ~ ., data = advertising)
+summary(model)
+
+# prosta linearna regresija
+model_tv <- lm(advertising$Sales ~ advertising$TV)
+summary(model_tv)
+
+# coeff
+# (intercept)estimate 7.032594 - 2*(std.error) 0.457843 -> donja granica = 6.130
+# (intercept)estimate 7.032594 + 2*(std.error) 0.457843 -> gornja granica = 7.930
+# residual standard error -> rse za Y
+# t value -> koliko je B1 udaljeno od nule 
+# |t| >= 0 -> p-vrednost
+# Odbacivanje nulte 5 ili 1%
+# normalna devijacija
+# rnorm -> za dobijanje radnom 
+x <- seq(-3,3,by = .5)
+dnorm(x, mean = 0, sd = 1) 
+
+
+# na ovaj nacin smo uzeli uzorak
+rnorm(10)
+
+# prosek u sum treba da bude priblizno nuli
+mean(rnorm(100))
+
+library(ISLR)
+pairs(Credit)
+model_c <-lm(Balance~Ethnicity, data = Credit)
+summary(model_c)
+
+library(rockchalk)
+model_tv_radio <- lm(Sales ~ TV + Radio, data = advertising)
+summary(model_tv_radio)
+summary(model_tv)
+
+plot(model_tv_radio,1)
+plot(model_tv,1)
+pairs(advertising)
+model_tv_radio_new <- lm(Sales~TV+Radio+Newspaper, data = advertising)
+
+summary(model_tv_radio_new)
+
+plot(model_tv_radio,4)
+
+plot(model_tv_radio_new,1)
+
+# resavanje Nelinearne
+# POLINOMSKE REGRESIJE
+model_auto = lm(mpg~horsepowr, data = Auto)
+model_auto2 = lm(mpg~poly(horsepower,2), data = Auto)
+model_auto5 = lm(mpg~poly(horsepower,5), data = Auto)
+# od postojecih pravimo nove features
+summary(model_auto2)
+
+predict_int = predict(model_auto, x= Auto$horsepower, interval = 'confidence', level = 0.99)
+
+ggplot(data = Auto) + geom_point(mapping = aes(x = horsepower, y = mpg)) + geom_line(mapping = aes(y = predict_int[,1], x = horsepower), color = 'blue')+geom_line(mapping = aes(y = model_auto2, x= horsepower))
+
+plot(model_auto,model_auto2,model_auto5)
+
+hp_model2 <- lm(mpg~horsepower + I(horsepower^2), data = Auto)
+plot(hp_model$fitted.values, hp_model$residuals)
+
+hp_model1 <- lm(mpg~horsepower, data = Auto)
+
+plot(hp_model1$fitted.values,hp_model1$residuals)
+plot(hp_model2$fitted.values, hp_model2$standardized.residulas)
+
+
+par(mfrow = c(2,2))
+plot(hp_model2)
+
+par(mfrow = c(2,2))
+plot(hp_model1)
+
+fitted = predict(hp_model1,as.data.frame(Auto["horsepower"]))
+tail(fitted)
+
+Credit
+plot(Credit$Limit, Credit$Age)
+plot(Credit$Limit, Credit$Rating)
+
+# Missing Values
+data(airquality)
+head(airquality)
+data <- airquality
+set.seed(123456)
+data$Solar.R[runif(nrow(data))<0.7] <- NA
+table(is.na(data))
+is.na(data$Solar.R)
+table(is.na(data$Solar.R))
+table(is.na(data$Day))
+
+#fully-observed
+comp <- complete.cases(data)
+mean(comp) 
+head(data[comp,])
+# izbacili smo NA vrednosti,
+# ostale su samo fully-observed
+table(is.na(data[comp,]))
+
+summary(lm(Ozone ~. -Solar.R, data = data))
+
+summary(lm(Ozone ~ ., data = subset(airquality, select = -Solar.R)))
+
+mod <-lm(Ozone ~., data = data)
+modAIC <- MASS::stepAIC(mod)
+
+AIC(lm(Ozone ~., data = data))
+
+# Imput data
+library(mice)
+# mean 
+air_mean <- complete(mice(data = data, m = 1, method = "mean"))
+
+table(is.na(air_mean))
+summary(air_mean)
+
+# with negative values
+air_mean_neg <- complete(mice(data = data, m = 1, method = c("norm.predict", rep("mean",5))))
+summary(air_mean_neg)
+
+# TITANIC - train.csv i test.csv
+summary(train)
+str(train)
+
+summary(test)
+str(test)
+
+# test set missing Survived
+test$Survived <-NA
+names(test)
+names(train)
+
+# combine two datasets  rbind
+titanic.full <- rbind(train,test)
+
+# delete column -> -Survived
+test = subset(test, select = -Surived)
+
+table(titanic.full$Embarked)
+titanic.full[titanic.full$Embarked == "",]
+
+table(titanic.full$Embarked, titanic.full$Sex)
+table(titanic.full$Pclass, titanic.full$Embarked)
+
+# no more missing values -> categorical
+titanic.full[titanic.full$Embarked == "", "Embarked"] <- "S"
+table(titanic.full$Embarked)
+
+# is there missing values in numeric
+table(is.na(titanic.full$Age))
+median(titanic.full$Age, na.rm =TRUE)
+
+titanic.males <- titanic.full[titanic.full$Sex == "male",]
+median(titanic.full$Age, na.rm = TRUE)
+
+medianAgeMale <-median(titanic.males$Age, na.rm = TRUE)
+titanic.full[is.na(titanic.full$Age)&titanic.full$Sex == "male","Age"] <-medianAgeMale
+
+titanic.females <- titanic.full[titanic.full$Sex == "female",]
+median(titanic.females$Age, na.rm = TRUE)
+medinaAgeFemale <- median(titanic.full$Age, na.rm = TRUE)
+
+titanic.full[is.na(titanic.full$Age)&titanic.full$Sex == "female", "Age"] <- medinaAgeFemale
+
+table(is.na(titanic.full$Age))
+
+table(is.na(titanic.full$Fare))
+MissingFare <- titanic.full[is.na(titanic.full$Fare),]
+titanic.full[is.na(titanic.full$Fare),"Fare"] <-12
+table(is.na(titanic.full$Fare))
+
+# cange Pclass, Sex, Embarked to factor
+
+str(titanic.full)
+
+titanic.full$Pclass <- as.factor(titanic.full$Pclass)
+titanic.full$Sex <- as.factor(titanic.full$Sex)
+titanic.full$Embarked <- as.factor(titanic.full$Embarked)
+str(titanic.full)
+
+# load a dataset Adveristing
+head(advertising)
+a <- advertising
+
+# split a date to train and test
+sample_size = floor(0.9*nrow(a))
+train = a[1:180,]
+test = a[181:nrow(a),]
+
+set.seed(42)
+sample_size1 = floor(0.9*nrow(advertising))
+train1 = sample(seq(1,nrow(advertising)), size = sample_size1)
+train_a = advertising[train1,]
+test_a = advertising[-train1,]
+
+summary(train)
+
+# make models
+
+#tv_model
+tv_model = lm(Sales~TV, data = train)
+summary(tv_model)
+plot(train$TV, train$Sales)
+abline(tv_model,col = "red")
+str(train)
+tv_radio_model = lm(Sales~TV+Radio, data = train)
+summary(tv_radio_model)
+
+model_sinergy = lm(Sales~TV*Radio, data = train)
+summary(model_sinergy)
+
+# prediction
+predict(model_tv_radio, advertising[1, c(1,2,3)], interval = "confidence")
+
+library(ISLR)
+summary(Auto)
+plot(Auto)
+
+# coleration -> only numerical 
+short = Auto[,c("mpg","displacement","horsepower","weight","acceleration")]
+cor(short)
+
+hp_model = lm(mpg~horsepower,data = Auto)
+summary(hp_model)
+
+
+summary(Auto)
+pairs(Auto)
+
+# linear regresion
+hp_model = lm(mpg~horsepower, data = Auto)
+hp_model2 = lm(mpg~horsepower+I(horsepower^2), data = Auto)
+
+                                                                          
+plot(hp_model2$fitted.values,hp_model2$residuals)
+
+par(mfrow = c(2,2))
+plot(hp_model)
+plot(hp_model2)
+
+# uporedjujes fitted i tail
+fitted = predict(hp_model, new_data = Auto[,c("horesepower")])
+tail(hp_model$fitted.values)
+fitted
+
+library(MASS)
+str(Boston)
+summary(Boston)
+
+pairs(Boston)
+
+lm.fit = lm(medv~lstat, data = Boston)
+summary(lm.fit)
+names(lm.fit)
+coef(lm.fit)
+confint(lm.fit)
+predict(lm.fit,data.frame(lstat=(c(5,10,15))), interval = "confidence")
+
+lm.fit11 = lm(medv~lstat, data = Boston)
+lm.fit2 = lm(medv~lstat+I(lstat^2), data = Boston)
+anova(lm.fit11,lm.fit2) # analiza varijasni
+
+# izbor prediktora
+summary(Hitters)
+Hitters = na.omit(Hitters) #brisanje NA
+
+sum(is.na(Hitters))
+
+library(leaps)
+
+# metode uzrokovanja
+library(ISLR)
+set.seed(1)
+dim(Auto)
+
+# sample train set and apply linear regression
+train = sample(392,196)
+lm_fit = lm(mpg~horsepower, data = Auto, subset = train)
+
+#MSE
+mean((mpg - predict(lm_fit,Auto))[-train]^2)
+
+#LOOCV
+library(boot)
+glm.fit = glm(mpg~horsepower, dat = Auto)
+cv.err = cv.glm(Auto, glm.fit)
+cv.err$delta
+
+# K-fold
+set.seed(17)
+er = rep(0,10)
+for(i in 1:10){
+  glm.fit = glm(mpg~poly(horsepower,2), data = Auto)
+  er = cv.glm(Auto, glm.fit, K = 10)$delta[1]
+}
+er
+
+# Bootstap
+alpha.fn = function(data,index){
+  X = data$X[index]
+  Y = data$Y[index]
+  return((var(Y) - cov(X,Y))/ (var(X)+var(Y) - 2*cov(x,Y)))
+}
+boot(Portfolio, alpha.fn, R = 1000)
+
+
+# KOLOKVIJUM 2020/2021
+library(MASS)
+head(Boston)
+b <- Boston
+library(tidyverse)
+summary(b)
+
+ggplot(data = Boston) + geom_point(mapping = aes(x = medv, y = age, color = chas))
+
+Boston$chas = factor(Boston$chas, labels = c("not near", "near"))
+
+library(tidyverse)
+Boston$chas=factor(Boston$chas,labels = c("not near","near"))
+ggplot(data = Boston)+
+  geom_point(mapping = aes(x=medv,y=age, color = chas))
+
+ggplot(data=Boston,mapping = aes(x=medv,y=age))+
+  geom_boxplot(mapping = aes(group=chas))
+  
+ggplot(data = Boston) + geom_histogram(mapping = aes(age), binwidth = 10)
+
+summary(Boston$age)    
+
+Boston$ageCut = vector(mode = "character", length= nrow(Boston))
+str(Boston)  
+summary(Boston)  
+  
+Boston$ageCut[which(Boston$age<=5)] = "nova"
+
+ggplot(data = Boston) + geom_bar(mapping = aes(x = ageCut))
+
+plot(Boston$medv, Boston$zn)
+abline(lm(Boston$zn~Boston$medv), col = "red")
+
+summary(Boston$medv, Boston$zn)
+
+sample_size = floor(0.85*nrow(Boston))
+set.seed(123)
+train.inx = sample(seq(1,nrow(Boston)), size = sample_size)
+
+train = Boston[train.inx,]
+test = Boston[-train.inx,]
+
+model1 = lm(medv~lstat, data = train)
+set.seed(1)
+summary(model1)
+
+par(mfrow = c(2,2))
+plot(model1)
+
+
+# polinomna regresija
+model_poly = lm(medv~poly(lstat,2), data = train)
+summary(model_poly)
+anova(model1, model_poly)
+
+ggplot(data = Boston) + geom_point(mapping = aes(x = lstat, y = medv)) + geom_smooth(mapping = aes(x = lstat, y = medv))
+
+model_poly_medv_lstat_rm=lm(medv~poly(lstat,2)+rm,data=train)
+summary(model_poly_medv_lstat_rm)
+anova(model_poly,model_poly_medv_lstat_rm)
+
+model_multiple=lm(medv~poly(lstat,2)+rm+age+chas,data=train)
+summary(model_multiple)
+anova(model_poly_medv_lstat_rm,model_multiple)
+#na osnovu rezultata anova f-ja, model iz 11og pitanja je bolji
+
+predict(model_multiple, newdata = train, interval = 'confidence')
+predict(model_multiple, newdata = train, interval = 'prediction')
+

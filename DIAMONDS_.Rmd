@@ -1,0 +1,207 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+# 1.
+library(tidyverse)
+
+# 2.
+diamonds = diamonds
+view(diamonds)
+?diamonds
+summary(diamonds)
+str(diamonds)
+
+# 3. Podeliti dati skup na trening i test podatke
+set.seed(123)
+size = floor(0.80*dim(diamonds)[1])
+index = sample(seq(1,dim(diamonds)[1]),size = size)
+train = diamonds[index,]
+test = diamonds[-index,]
+
+# Primeniti tehnike detektovanja izuzetaka/visoke poluge
+# u slucaju num podataka koristiti boxplot i uvideti outliere
+
+ggplot(data = diamonds, aes(x = carat))+geom_boxplot(outlier.color = "red")
+ggplot(data = diamonds, aes(x = depth))+geom_boxplot(outlier.color = "blue")
+ggplot(data = diamonds, aes(x = price))+geom_boxplot(outlier.color = "yellow")
+ggplot(data = diamonds, aes(x = x))+geom_boxplot(outlier.colour = "purple")
+ggplot(data = diamonds, aes(x = y))+geom_boxplot(outlier.color = "grey")
+ggplot(data = diamonds, aes(x = z))+geom_boxplot(outlier.colour = "black")
+ggplot(data = diamonds, aes(x = table))+geom_boxplot(outlier.color = "blue")
+
+# outliere kod kategorijskih mozemo uvideti ako prikazemo levele, 
+# i uvidimo da li postoji neka greska
+
+unique(diamonds$cut)
+unique(diamonds$color)
+unique(diamonds$clarity)
+
+ggplot(diamonds, mapping = aes(x = diamonds$cut))+geom_bar()
+ggplot(diamonds, mapping = aes(x = diamonds$color))+geom_bar()
+ggplot(diamonds, mapping = aes(x = diamonds$clarity))+geom_bar()
+
+# Nacrtati bar 3 grafika i objasniti kako te zakljucke trebamo koristiti za pravljenje modela
+# Predvidjamo cena dijamanata, zbog toga gledamo odnos cene i ostalih features-a
+
+pairs(diamonds)
+
+# povezanost price -> carat
+ggplot(data = diamonds, aes(x = carat, y = price))+geom_point()+geom_smooth()
+cor(diamonds$price,diamonds$carat) # 0.9215913
+
+# povezanost price -> x
+ggplot(data = diamonds, aes(x = x, y = price))+geom_point()+geom_smooth()
+cor(diamonds$price, diamonds$x) # 0.8844352
+
+# povezanost price -> y
+ggplot(data = diamonds, aes(x = y, y = price))+geom_point()+geom_smooth()
+cor(diamonds$price, diamonds$y) # 0.8654209
+
+# povezanost price -> z
+ggplot(data = diamonds, aes(x = z, y = price))+geom_point()+geom_smooth()
+cor(diamonds$price, diamonds$z) # 0.8612494
+
+# Odrediti koji prediktori oitencionalno trebaju da uticu na predikciju
+# obrazloziti odgovor
+
+# zakljucujemo da bi carat, x, y, z trebalo precizno da uticu na predikcuju, sto vidimo sa grafika
+
+# Napraviti modele
+model_1 = lm(data = train, price~carat)
+summary(model_1) 
+plot(model_1)
+# RSS 102031916264
+sum(resid(model_1)^2)
+
+
+
+# R-square = 85%
+# p-value < 2.2e-16
+
+model_2 = lm(data = train, price~x)
+summary(model_2)
+# R-square = 78%
+# p-value < 2.2e-16
+
+model_pol_2 = lm(data = train, price~x+I(x^2))
+summary(model_pol_2)
+# R-square = 86%
+# p-value < 2.2e-16
+
+anova(model_1,model_pol_2)
+
+model_3 = lm(data = train, price~y)
+summary(model_3)
+# R-square = 74%
+# p-value < 2.2e-16
+
+model_pol_3 = lm(data = train, price~y+I(y^2))
+summary(model_pol_3)
+# R-square = 77%
+# p-value < 2.2e-16
+
+model_4 = lm(data = train, price~z)
+summary(model_4)
+# R-square = 76%
+# p-value < 2.2e-16
+
+model_4 = lm(data = train, price~z+I(z^2))
+summary(model_4)
+# R-square = 84%
+# p-value < 2.2e-16
+
+model_1_2 = lm(data = train, price~x+I(x^2)+carat)
+summary(model_1_2)
+# R-square = 86%
+# p-value < 2.2e-16
+
+model_1_2_3 = lm(data = train, price~x+I(x^1)+carat+y+I(y^2))
+summary(model_1_2_3)
+# R-square = 85%
+# p-value < 2.2e-16
+
+anova(model_1_2, model_1_2_3)
+
+model_1_2_4 = lm(data = train,price~x+I(x^2)+z+I(z^2)+carat)
+summary(model_1_2_4)
+# R-square = 86%
+# p-value < 2.2e-16
+
+model_2_3 = lm(data = train, price~x+I(x^2)+y+I(y^2))
+summary(model_2_3)
+# R-square = 86%
+# p-value = 2.2e-16
+
+anova(model_1_2_4,model_2_3)
+
+model_3_4 = lm(data = train, price~y+I(y^2)+z+(z^2))
+summary(model_3_4)
+# R-square = 77%
+# p-value = 2.2e-16
+
+anova(model_1_2_4,model_1_2_3,model_1_2, model_2_3)
+
+# model_1_2_3, model_2_3) -> nam daju najbolje Pr(>F)
+# izabrani modeli ->
+# RMSE za test i trening skupove
+
+# RMSE of test > RMSE of train => OVER FITTING of the data
+# RMSE of test < RMSE of train => UNDER FITTING of the data
+rmse_1_2_4_train = mean(model_1_2_4$residuals^2) #2185908
+rmse_1_2_4_test = mean((test$price-predict(model_1_2_4,test))^2) #5288866
+
+rmse_1_2_3_train = mean(model_1_2_3$residuals^2) # 2291066
+rmse_1_2_3_test = mean((test$price-predict(model_1_2_3,test))^2) #2479923
+
+rmse_2_3_train = mean(model_2_3$residuals^2) #2177198
+rmse_2_3_test = mean((test$price-predict(model_2_3,test))^2) # 2384953
+
+
+# U modelu mora na kraju da bude ukljucena jedna kategorijska promeljiva, ispitujemo
+str(diamonds) # cut,color,clarity
+pairs(diamonds)
+
+model = lm(data = train, train$price~.)
+summary(model)
+
+model_1_2_3_cut = lm(data = train, price~x+I(x^2)+carat+y+I(y^2)+cut)
+summary(model_1_2_3_cut)
+# R-square 0.86
+# p - value 2.2e-16
+
+model_1_2_3_color = lm(data = train, price~x+I(x^2)+carat+y+I(y^2)+color)
+summary(model_1_2_3_color)
+# R-square 0.87
+# p-value 2.2e-16
+
+model_1_2_3_clarity = lm(data = train, price~x+I(x^2)+carat+y+I(y^2)+clarity)
+summary(model_1_2_3_clarity)
+# R-square 0.90
+# p-value 2.2e-16
+
+# model_1_2_3_cut
+rmse_train = mean(model_1_2_3_cut$residuals^2) # 2175147
+rmse_test = mean((diamonds$price-predict(model_1_2_3_cut,test))^2) # 25566895
+
+# model_1_2_3_clarity
+rmse_train_clarity = mean(model_1_2_3_clarity$residuals^2) # 1555633
+rmse_test_clarity = mean((diamonds$price - predict(model_1_2_3_clarity,test))^2) #25988470
+# There are two reasons this warning may occur:
+
+# Reason 1: Two predictor variables are perfectly correlated.
+
+# Reason 2: You have more model parameters than observations in the dataset.
+# cook's distance points: 25435, 11773
+plot(model_1_2_3_cut)
+
+# cook's distance points: 25435,39275,11773
+plot(model_1_2_3_clarity)
+
+sum(resid(model_1_2_3_cut)^2)
+sum(resid(model_1)^2)
+summary(model)
+
+
+
